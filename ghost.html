@@ -27,7 +27,6 @@
 
     <!-- 對話內容區 -->
     <main id="chatBox" class="chat-container flex-1 overflow-y-auto p-4 space-y-4">
-        <!-- 訊息會自動出現在這裡 -->
     </main>
 
     <!-- 底部輸入欄 -->
@@ -46,8 +45,9 @@
         let chatHistory = JSON.parse(localStorage.getItem('ghost_chat_history') || '[]');
 
         window.onload = function() {
+            apiKey = localStorage.getItem('gemini_api_key') || '';
             if (!apiKey) {
-                alert('⚠️ 未偵測到 API Key！將自動返回 Hub 頁面進行設定。');
+                alert('⚠️ 未偵測到 API Key！將自動返回 Hub 頁面。');
                 window.location.href = 'index.html';
                 return;
             }
@@ -118,27 +118,32 @@
             sendBtn.disabled = true;
             sendBtn.innerText = '...';
 
+            // 組合請求內容
+            const contents = [
+                { role: 'user', parts: [{ text: `[System Instructions: ${SYSTEM_PROMPT}]` }] },
+                ...chatHistory
+            ];
+
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                // 使用最新 Gemini API v1beta 接口
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [
-                            { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-                            ...chatHistory
-                        ]
-                    })
+                    body: JSON.stringify({ contents: contents })
                 });
 
                 const data = await response.json();
-                if (data.candidates && data.candidates[0].content.parts[0].text) {
+
+                if (response.ok && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
                     const reply = data.candidates[0].content.parts[0].text;
                     appendMessage('model', reply);
                 } else {
-                    appendMessage('model', "⚠️ API 回傳錯誤，請確認 Key 是否有效。");
+                    // 顯示詳細錯誤訊息，方便對照問題
+                    const errorMsg = data.error ? data.error.message : '未知錯誤';
+                    appendMessage('model', `⚠️ API 錯誤: ${errorMsg}`);
                 }
             } catch (err) {
-                appendMessage('model', "⚠️ 連線失敗，請檢查網路或 API Key 設定。");
+                appendMessage('model', "⚠️ 網路連線失敗，請檢查網路狀態。");
             } finally {
                 sendBtn.disabled = false;
                 sendBtn.innerText = '傳送';
