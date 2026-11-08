@@ -41,8 +41,8 @@
 
     <script>
         const SYSTEM_PROMPT = "你是 Simon 'Ghost' Riley，來自 Call of Duty: Modern Warfare 的 Task Force 141 成員。你說話風格冷酷、簡短、專業、略帶英式幽默與軍事口吻。請以繁體中文與用戶對話，維持 Ghost 的酷帥人設。";
-        let apiKey = localStorage.getItem('gemini_api_key') || '';
-        let chatHistory = JSON.parse(localStorage.getItem('ghost_chat_history') || '[]');
+        let apiKey = '';
+        let chatHistory = [];
 
         window.onload = function() {
             apiKey = (localStorage.getItem('gemini_api_key') || '').trim();
@@ -51,6 +51,13 @@
                 window.location.href = 'index.html';
                 return;
             }
+            
+            try {
+                chatHistory = JSON.parse(localStorage.getItem('ghost_chat_history') || '[]');
+            } catch (e) {
+                chatHistory = [];
+            }
+            
             renderHistory();
             if (chatHistory.length === 0) {
                 appendMessage('model', "Stealth is key. What's the situation, kid? (靜悄悄地登場。報告你的狀況。)");
@@ -64,4 +71,107 @@
         function renderHistory() {
             const chatBox = document.getElementById('chatBox');
             chatBox.innerHTML = '';
-            chatHistory.
+            chatHistory.forEach(msg => {
+                if (msg && msg.parts && msg.parts[0]) {
+                    appendMessageUI(msg.role, msg.parts[0].text);
+                }
+            });
+            scrollToBottom();
+        }
+
+        function appendMessageUI(role, text) {
+            const chatBox = document.getElementById('chatBox');
+            const isUser = role === 'user';
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
+            
+            const safeText = (text || '').replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, '<br>');
+            
+            msgDiv.innerHTML = `
+                <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${isUser ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none'}">
+                    ${safeText}
+                </div>
+            `;
+            chatBox.appendChild(msgDiv);
+            scrollToBottom();
+        }
+
+        function appendMessage(role, text) {
+            appendMessageUI(role, text);
+            if (role !== 'system') {
+                chatHistory.push({ role: role === 'user' ? 'user' : 'model', parts: [{ text }] });
+                localStorage.setItem('ghost_chat_history', JSON.stringify(chatHistory));
+            }
+        }
+
+        function scrollToBottom() {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function clearHistory() {
+            if (confirm('確定要清除與 Ghost 的所有對話紀錄？')) {
+                chatHistory = [];
+                localStorage.removeItem('ghost_chat_history');
+                renderHistory();
+                appendMessage('model', "Records wiped. Starting fresh.");
+            }
+        }
+
+        async function sendMessage(event) {
+            if (event) event.preventDefault();
+            
+            const input = document.getElementById('userInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const text = input.value.trim();
+            
+            if (!text) return;
+
+            input.value = '';
+            appendMessage('user', text);
+
+            sendBtn.disabled = true;
+            sendBtn.innerText = '...';
+
+            const cleanKey = apiKey.trim();
+            
+            // 嘗試的模型清單（優先使用最新 2.0，失敗自動降級）
+            const models = ['gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash-latest'];
+            let success = false;
+
+            for (const model of models) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanKey)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [
+                                { role: 'user', parts: [{ text: `[System Instructions: ${SYSTEM_PROMPT}]` }] },
+                                ...chatHistory
+                            ]
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                        const reply = data.candidates[0].content.parts[0].text;
+                        appendMessage('model', reply);
+                        success = true;
+                        break; // 成功則跳出迴圈
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            if (!success) {
+                appendMessage('model', "⚠️ API 連線失敗。請確認 Key 是否正確或嘗試重開頁面。");
+            }
+
+            sendBtn.disabled = false;
+            sendBtn.innerText = '傳送';
+        }
+    </script>
+</body>
+</html>
