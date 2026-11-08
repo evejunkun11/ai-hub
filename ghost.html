@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
@@ -7,21 +7,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #090d16; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-        .safe-top { padding-top: env(safe-area-inset-top); }
-        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col justify-between overflow-hidden bg-slate-950">
+<body class="bg-slate-950 flex flex-col justify-between min-h-screen">
 
-    <!-- 頂部導航欄 -->
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 z-50 safe-top">
-        <a href="index.html" class="text-blue-400 hover:text-white text-sm font-semibold py-1 px-2">❮ 返回 Hub</a>
+    <!-- 頂部導航欄（固定置頂） -->
+    <header class="fixed top-0 left-0 right-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between z-50">
+        <a href="index.html" class="text-blue-400 text-sm font-semibold py-1 px-2">❮ 返回 Hub</a>
         <h1 class="text-sm font-bold text-white">💀 Simon Ghost</h1>
         <button onclick="clearHistory()" class="text-xs text-red-400 py-1 px-2">清除紀錄</button>
     </header>
 
-    <!-- 對話內容區 -->
-    <main id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3">
+    <!-- 對話內容區（上下加上 padding 避免被頂部同底部欄遮擋） -->
+    <main id="chatBox" class="flex-1 overflow-y-auto px-4 pt-20 pb-24 space-y-3">
         <div class="flex justify-start">
             <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200">
                 Stealth is key. What's the situation, kid?
@@ -29,8 +27,8 @@
         </div>
     </main>
 
-    <!-- 底部輸入欄 -->
-    <footer class="bg-slate-900 border-t border-slate-800 p-3 shrink-0 z-50 safe-bottom">
+    <!-- 底部輸入欄（使用 fixed bottom 確保永遠浮喺最底，按鈕絕不消失） -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 p-3 z-50">
         <form id="chatForm" onsubmit="handleSubmit(event)" class="flex items-center gap-2 max-w-2xl mx-auto">
             <input type="text" id="userInput" placeholder="傳送訊息給 Ghost..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500" autocomplete="off">
             <button type="submit" id="sendBtn" class="bg-blue-600 active:bg-blue-700 text-white font-medium px-5 py-3 rounded-xl text-sm shrink-0">
@@ -53,5 +51,4 @@
             event.preventDefault();
             
             const input = document.getElementById('userInput');
-            const chatBox = document.getElementById('chatBox');
-            const sendBtn = document.getElementById('send
+            const
