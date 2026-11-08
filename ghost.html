@@ -2,175 +2,74 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Simon "Ghost" Riley</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background-color: #090d16; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-        .chat-container { height: calc(100vh - 130px); }
-    </style>
 </head>
-<body class="h-screen w-screen flex flex-col justify-between overflow-hidden">
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col justify-between">
 
-    <!-- 頂部導航欄 -->
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0">
-        <div class="flex items-center space-x-3">
-            <button onclick="goBack()" class="text-slate-400 hover:text-white text-sm font-medium flex items-center">
-                ❮ 返回 Hub
-            </button>
-            <h1 class="text-base font-bold text-white flex items-center gap-1.5">
-                <span>💀</span> Simon "Ghost" Riley
-            </h1>
-        </div>
-        <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-red-400">清除紀錄</button>
+    <!-- 頂部 -->
+    <header class="bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center">
+        <a href="index.html" class="text-blue-400 text-sm font-medium">❮ 返回 Hub</a>
+        <h1 class="font-bold text-sm">💀 Simon Ghost</h1>
+        <button onclick="localStorage.removeItem('ghost_chat_history'); location.reload();" class="text-xs text-red-400">清除</button>
     </header>
 
-    <!-- 對話內容區 -->
-    <main id="chatBox" class="chat-container flex-1 overflow-y-auto p-4 space-y-4">
+    <!-- 對話記錄區 -->
+    <main id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="bg-slate-900 p-3 rounded-xl max-w-[85%] text-sm">
+            Stealth is key. What's the situation, kid?
+        </div>
     </main>
 
-    <!-- 底部輸入欄 -->
-    <footer class="bg-slate-900 border-t border-slate-800 p-3 shrink-0">
-        <form id="chatForm" onsubmit="sendMessage(event)" class="flex items-center gap-2 max-w-2xl mx-auto">
-            <input type="text" id="userInput" placeholder="傳送訊息給 Ghost..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500" autocomplete="off">
-            <button type="submit" id="sendBtn" class="bg-blue-600 active:bg-blue-700 text-white font-medium px-5 py-3 rounded-xl text-sm transition-colors shrink-0">
-                傳送
-            </button>
-        </form>
+    <!-- 輸入區 -->
+    <footer class="bg-slate-900 p-3 border-t border-slate-800">
+        <div class="flex gap-2">
+            <input type="text" id="userInput" placeholder="輸入訊息..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+            <button onclick="sendMsg()" id="sendBtn" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium">傳送</button>
+        </div>
     </footer>
 
     <script>
-        const SYSTEM_PROMPT = "你是 Simon 'Ghost' Riley，來自 Call of Duty: Modern Warfare 的 Task Force 141 成員。你說話風格冷酷、簡短、專業、略帶英式幽默與軍事口吻。請以繁體中文與用戶對話，維持 Ghost 的酷帥人設。";
-        let apiKey = '';
-        let chatHistory = [];
+        async function sendMsg() {
+            const input = document.getElementById('userInput');
+            const chatBox = document.getElementById('chatBox');
+            const text = input.value.trim();
+            const apiKey = localStorage.getItem('gemini_api_key');
 
-        window.onload = function() {
-            apiKey = (localStorage.getItem('gemini_api_key') || '').trim();
+            if (!text) return;
             if (!apiKey) {
-                alert('⚠️ 未偵測到 API Key！將自動返回 Hub 頁面。');
-                window.location.href = 'index.html';
+                alert('請先在 Hub 設定 API Key！');
+                location.href = 'index.html';
                 return;
             }
-            
-            try {
-                chatHistory = JSON.parse(localStorage.getItem('ghost_chat_history') || '[]');
-            } catch (e) {
-                chatHistory = [];
-            }
-            
-            renderHistory();
-            if (chatHistory.length === 0) {
-                appendMessage('model', "Stealth is key. What's the situation, kid? (靜悄悄地登場。報告你的狀況。)");
-            }
-        };
 
-        function goBack() {
-            window.location.href = 'index.html';
-        }
-
-        function renderHistory() {
-            const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML = '';
-            chatHistory.forEach(msg => {
-                if (msg && msg.parts && msg.parts[0]) {
-                    appendMessageUI(msg.role, msg.parts[0].text);
-                }
-            });
-            scrollToBottom();
-        }
-
-        function appendMessageUI(role, text) {
-            const chatBox = document.getElementById('chatBox');
-            const isUser = role === 'user';
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
-            
-            const safeText = (text || '').replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, '<br>');
-            
-            msgDiv.innerHTML = `
-                <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${isUser ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none'}">
-                    ${safeText}
-                </div>
-            `;
-            chatBox.appendChild(msgDiv);
-            scrollToBottom();
-        }
-
-        function appendMessage(role, text) {
-            appendMessageUI(role, text);
-            if (role !== 'system') {
-                chatHistory.push({ role: role === 'user' ? 'user' : 'model', parts: [{ text }] });
-                localStorage.setItem('ghost_chat_history', JSON.stringify(chatHistory));
-            }
-        }
-
-        function scrollToBottom() {
-            const chatBox = document.getElementById('chatBox');
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function clearHistory() {
-            if (confirm('確定要清除與 Ghost 的所有對話紀錄？')) {
-                chatHistory = [];
-                localStorage.removeItem('ghost_chat_history');
-                renderHistory();
-                appendMessage('model', "Records wiped. Starting fresh.");
-            }
-        }
-
-        async function sendMessage(event) {
-            if (event) event.preventDefault();
-            
-            const input = document.getElementById('userInput');
-            const sendBtn = document.getElementById('sendBtn');
-            const text = input.value.trim();
-            
-            if (!text) return;
-
+            // 顯示用戶訊息
+            chatBox.innerHTML += `<div class="bg-blue-600 text-white p-3 rounded-xl max-w-[85%] ml-auto text-sm">${text}</div>`;
             input.value = '';
-            appendMessage('user', text);
+            chatBox.scrollTop = chatBox.scrollHeight;
 
-            sendBtn.disabled = true;
-            sendBtn.innerText = '...';
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: text }] }]
+                    })
+                });
 
-            const cleanKey = apiKey.trim();
-            
-            // 嘗試的模型清單（優先使用最新 2.0，失敗自動降級）
-            const models = ['gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash-latest'];
-            let success = false;
-
-            for (const model of models) {
-                try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanKey)}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [
-                                { role: 'user', parts: [{ text: `[System Instructions: ${SYSTEM_PROMPT}]` }] },
-                                ...chatHistory
-                            ]
-                        })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-                        const reply = data.candidates[0].content.parts[0].text;
-                        appendMessage('model', reply);
-                        success = true;
-                        break; // 成功則跳出迴圈
-                    }
-                } catch (e) {
-                    console.error(e);
+                const data = await res.json();
+                
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    const reply = data.candidates[0].content.parts[0].text;
+                    chatBox.innerHTML += `<div class="bg-slate-900 p-3 rounded-xl max-w-[85%] text-sm">${reply}</div>`;
+                } else {
+                    chatBox.innerHTML += `<div class="bg-red-900/50 text-red-300 p-3 rounded-xl max-w-[85%] text-sm">API 回傳格式錯誤</div>`;
                 }
+            } catch (err) {
+                chatBox.innerHTML += `<div class="bg-red-900/50 text-red-300 p-3 rounded-xl max-w-[85%] text-sm">連線失敗: ${err.message}</div>`;
             }
-
-            if (!success) {
-                appendMessage('model', "⚠️ API 連線失敗。請確認 Key 是否正確或嘗試重開頁面。");
-            }
-
-            sendBtn.disabled = false;
-            sendBtn.innerText = '傳送';
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
