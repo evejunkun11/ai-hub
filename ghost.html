@@ -1,3 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Simon "Ghost" Riley</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #090d16; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; }
+    </style>
+</head>
+<body class="bg-slate-950 flex flex-col justify-between h-screen overflow-hidden">
+
+    <!-- 頂部導航 -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 z-50">
+        <a href="index.html" class="text-blue-400 text-sm font-semibold py-1">❮ 返回 Hub</a>
+        <h1 class="text-sm font-bold text-white">💀 Simon Ghost</h1>
+        <button onclick="clearHistory()" class="text-xs text-red-400 py-1">清除紀錄</button>
+    </header>
+
+    <!-- 對話內容區 -->
+    <main id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3 pt-16 pb-20">
+        <div class="flex justify-start">
+            <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200">
+                Stealth is key. What's the situation, kid?
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部輸入欄 (絕對固定在最底，絕不消失) -->
+    <footer class="bg-slate-900 border-t border-slate-800 p-3 shrink-0 z-50">
+        <div class="flex items-center gap-2 max-w-2xl mx-auto">
+            <input type="text" id="userInput" placeholder="傳送訊息給 Ghost..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500" autocomplete="off">
+            <button onclick="sendMsg()" id="sendBtn" class="bg-blue-600 active:bg-blue-700 text-white font-medium px-5 py-3 rounded-xl text-sm shrink-0">
+                傳送
+            </button>
+        </div>
+    </footer>
+
     <script>
         const SYSTEM_PROMPT = "你是 Simon 'Ghost' Riley，來自 Call of Duty: Modern Warfare 的 Task Force 141 成員。你說話風格冷酷、簡短、專業、略帶英式幽默與軍事口吻。請以繁體中文與用戶對話，維持 Ghost 的酷帥人設。";
 
@@ -17,14 +56,15 @@
 
             if (!text) return;
             if (!apiKey) {
-                alert('⚠️ 請先在 Hub 頁面儲存 API Key！');
+                alert('⚠️ 尚未設定 API Key，請返回 Hub 設定！');
                 window.location.href = 'index.html';
                 return;
             }
 
+            // 1. 顯示用戶訊息
             const userMsgDiv = document.createElement('div');
             userMsgDiv.className = 'flex justify-end';
-            userMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py.5 text-sm bg-blue-600 text-white">${text.replace(/</g, "&lt;")}</div>`;
+            userMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-blue-600 text-white">${text.replace(/</g, "&lt;")}</div>`;
             chatBox.appendChild(userMsgDiv);
             
             input.value = '';
@@ -34,19 +74,15 @@
             sendBtn.innerText = '...';
 
             try {
-                // 修正 1：將型號改為正確嘅 gemini-2.0-flash (或 gemini-1.5-flash)
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+                // 使用目前官方最穩定的 gemini-1.5-flash 模型
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
                 
-                // 修正 2：使用官方推薦嘅 system_instruction 格式
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        system_instruction: {
-                            parts: [{ text: SYSTEM_PROMPT }]
-                        },
                         contents: [
-                            { role: 'user', parts: [{ text: text }] }
+                            { role: 'user', parts: [{ text: `[System Instructions: ${SYSTEM_PROMPT}] ${text}` }] }
                         ]
                     })
                 });
@@ -59,19 +95,12 @@
                     const reply = data.candidates[0].content.parts[0].text;
                     aiMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200">${reply.replace(/\n/g, '<br>')}</div>`;
                 } else {
-                    aiMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-xs bg-red-950 border border-red-800 text-red-200 font-mono">⚠️ 原始回傳數據: ${JSON.stringify(data)}</div>`;
+                    // 如果有錯誤，直接把錯誤原因完整印出來
+                    const errorMsg = data.error?.message || JSON.stringify(data);
+                    aiMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-xs bg-red-950 border border-red-800 text-red-200 font-mono">⚠️ API 拒絕: ${errorMsg}</div>`;
                 }
                 chatBox.appendChild(aiMsgDiv);
 
             } catch (err) {
                 const errDiv = document.createElement('div');
                 errDiv.className = 'flex justify-start';
-                errDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-red-950 border border-red-800 text-red-200">⚠️ 捕捉到例外錯誤: ${err.message}</div>`;
-                chatBox.appendChild(errDiv);
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.innerText = '傳送';
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
-        }
-    </script>
