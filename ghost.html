@@ -13,36 +13,30 @@
 </head>
 <body class="h-screen w-screen flex flex-col justify-between overflow-hidden bg-slate-950">
 
-    <!-- 頂部導航欄 -->
+    <!-- 頂部導航欄（使用標準超連結，保證返回按鈕一定得） -->
     <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 z-50 safe-top">
-        <button onclick="window.location.href='index.html'" class="text-blue-400 hover:text-white text-sm font-semibold py-1 px-2 rounded">
-            ❮ 返回 Hub
-        </button>
-        <h1 class="text-sm font-bold text-white flex items-center gap-1.5">
-            <span>💀</span> Simon Ghost
-        </h1>
-        <button onclick="clearHistory()" class="text-xs text-red-400 hover:text-red-300 py-1 px-2">
-            清除紀錄
-        </button>
+        <a href="index.html" class="text-blue-400 hover:text-white text-sm font-semibold py-1 px-2">❮ 返回 Hub</a>
+        <h1 class="text-sm font-bold text-white">💀 Simon Ghost</h1>
+        <button onclick="clearHistory()" class="text-xs text-red-400 py-1 px-2">清除紀錄</button>
     </header>
 
     <!-- 對話內容區 -->
     <main id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3">
         <div class="flex justify-start">
-            <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none">
-                Stealth is key. What's the situation, kid? (靜悄悄地登場。報告你的狀況。)
+            <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200">
+                Stealth is key. What's the situation, kid?
             </div>
         </div>
     </main>
 
-    <!-- 底部輸入欄 -->
+    <!-- 底部輸入欄（改用標準 Form Submit，手機操作最穩陣） -->
     <footer class="bg-slate-900 border-t border-slate-800 p-3 shrink-0 z-50 safe-bottom">
-        <div class="flex items-center gap-2 max-w-2xl mx-auto">
+        <form id="chatForm" onsubmit="handleSubmit(event)" class="flex items-center gap-2 max-w-2xl mx-auto">
             <input type="text" id="userInput" placeholder="傳送訊息給 Ghost..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500" autocomplete="off">
-            <button onclick="sendMessage()" id="sendBtn" class="bg-blue-600 active:bg-blue-700 text-white font-medium px-5 py-3 rounded-xl text-sm transition-colors shrink-0">
+            <button type="submit" id="sendBtn" class="bg-blue-600 active:bg-blue-700 text-white font-medium px-5 py-3 rounded-xl text-sm shrink-0">
                 傳送
             </button>
-        </div>
+        </form>
     </footer>
 
     <script>
@@ -55,7 +49,9 @@
             }
         }
 
-        async function sendMessage() {
+        async function handleSubmit(event) {
+            event.preventDefault(); // 阻止頁面跳轉
+            
             const input = document.getElementById('userInput');
             const chatBox = document.getElementById('chatBox');
             const sendBtn = document.getElementById('sendBtn');
@@ -64,73 +60,4 @@
 
             if (!text) return;
             if (!apiKey) {
-                alert('⚠️ 未偵測到 API Key！請先返回 Hub 頁面設定。');
-                window.location.href = 'index.html';
-                return;
-            }
-
-            // 顯示用戶訊息
-            chatBox.innerHTML += `
-                <div class="flex justify-end">
-                    <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-blue-600 text-white rounded-br-none">
-                        ${text.replace(/</g, "&lt;")}
-                    </div>
-                </div>
-            `;
-            input.value = '';
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            sendBtn.disabled = true;
-            sendBtn.innerText = '...';
-
-            try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [
-                            { role: 'user', parts: [{ text: `[System Instructions: ${SYSTEM_PROMPT}] ${text}` }] }
-                        ]
-                    })
-                });
-
-                const data = await res.json();
-
-                // 檢查是否成功取得回覆文字
-                if (res.ok && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-                    const reply = data.candidates[0].content.parts[0].text;
-                    chatBox.innerHTML += `
-                        <div class="flex justify-start">
-                            <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none">
-                                ${reply.replace(/\n/g, '<br>')}
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    // 如果格式唔同，直接將 Google 回傳嘅 JSON 內容印出嚟俾我哋睇
-                    const rawJson = JSON.stringify(data);
-                    chatBox.innerHTML += `
-                        <div class="flex justify-start">
-                            <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-xs bg-red-950 border border-red-800 text-red-200 rounded-bl-none font-mono overflow-x-auto">
-                                ⚠️ 收到奇怪格式: ${rawJson}
-                            </div>
-                        </div>
-                    `;
-                }
-            } catch (err) {
-                chatBox.innerHTML += `
-                    <div class="flex justify-start">
-                        <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-red-950 border border-red-800 text-red-200 rounded-bl-none">
-                            ⚠️ 網絡或解析錯誤: ${err.message}
-                        </div>
-                    </div>
-                `;
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.innerText = '傳送';
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
-        }
-    </script>
-</body>
-</html>
+                alert('
