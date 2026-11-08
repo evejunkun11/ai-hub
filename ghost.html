@@ -62,7 +62,6 @@
                 return;
             }
 
-            // 1. 立即渲染使用者訊息到畫面上
             const userMsgDiv = document.createElement('div');
             userMsgDiv.className = 'flex justify-end';
             userMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-blue-600 text-white">${text.replace(/</g, "&lt;")}</div>`;
@@ -75,7 +74,6 @@
             sendBtn.innerText = '...';
 
             try {
-                // 直接使用官方路徑，不經 Proxy
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
                 
                 const response = await fetch(url, {
@@ -89,7 +87,6 @@
                 });
 
                 const data = await response.json();
-
                 const aiMsgDiv = document.createElement('div');
                 aiMsgDiv.className = 'flex justify-start';
 
@@ -97,15 +94,15 @@
                     const reply = data.candidates[0].content.parts[0].text;
                     aiMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200">${reply.replace(/\n/g, '<br>')}</div>`;
                 } else {
-                    const errText = data.error ? data.error.message : JSON.stringify(data);
-                    aiMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-xs bg-red-950 border border-red-800 text-red-200 font-mono">⚠️ 伺服器回傳錯誤: ${errText}</div>`;
+                    // 如果失敗，直接印出整包 JSON，絕對唔會再出現 undefined
+                    aiMsgDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-xs bg-red-950 border border-red-800 text-red-200 font-mono">⚠️ 原始回傳數據: ${JSON.stringify(data)}</div>`;
                 }
                 chatBox.appendChild(aiMsgDiv);
 
             } catch (err) {
                 const errDiv = document.createElement('div');
                 errDiv.className = 'flex justify-start';
-                errDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-red-950 border border-red-800 text-red-200">⚠️ 連線失敗: ${err.message}</div>`;
+                errDiv.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-red-950 border border-red-800 text-red-200">⚠️ 捕捉到例外錯誤: ${err.message}</div>`;
                 chatBox.appendChild(errDiv);
             } finally {
                 sendBtn.disabled = false;
