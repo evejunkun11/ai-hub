@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
@@ -11,14 +11,14 @@
 </head>
 <body class="bg-slate-950 flex flex-col justify-between min-h-screen">
 
-    <!-- 頂部導航欄（固定置頂） -->
+    <!-- 頂部導航欄 -->
     <header class="fixed top-0 left-0 right-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between z-50">
         <a href="index.html" class="text-blue-400 text-sm font-semibold py-1 px-2">❮ 返回 Hub</a>
         <h1 class="text-sm font-bold text-white">💀 Simon Ghost</h1>
         <button onclick="clearHistory()" class="text-xs text-red-400 py-1 px-2">清除紀錄</button>
     </header>
 
-    <!-- 對話內容區（上下加上 padding 避免被頂部同底部欄遮擋） -->
+    <!-- 對話內容區 -->
     <main id="chatBox" class="flex-1 overflow-y-auto px-4 pt-20 pb-24 space-y-3">
         <div class="flex justify-start">
             <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200">
@@ -27,14 +27,14 @@
         </div>
     </main>
 
-    <!-- 底部輸入欄（使用 fixed bottom 確保永遠浮喺最底，按鈕絕不消失） -->
+    <!-- 底部輸入欄 -->
     <footer class="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 p-3 z-50">
-        <form id="chatForm" onsubmit="handleSubmit(event)" class="flex items-center gap-2 max-w-2xl mx-auto">
+        <div class="flex items-center gap-2 max-w-2xl mx-auto">
             <input type="text" id="userInput" placeholder="傳送訊息給 Ghost..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500" autocomplete="off">
-            <button type="submit" id="sendBtn" class="bg-blue-600 active:bg-blue-700 text-white font-medium px-5 py-3 rounded-xl text-sm shrink-0">
+            <button onclick="sendMsgDirect()" id="sendBtn" class="bg-blue-600 active:bg-blue-700 text-white font-medium px-5 py-3 rounded-xl text-sm shrink-0">
                 傳送
             </button>
-        </form>
+        </div>
     </footer>
 
     <script>
@@ -47,8 +47,93 @@
             }
         }
 
-        function handleSubmit(event) {
-            event.preventDefault();
-            
-            const input = document.getElementById('userInput');
-            const
+        function sendMsgDirect() {
+            var input = document.getElementById('userInput');
+            var chatBox = document.getElementById('chatBox');
+            var sendBtn = document.getElementById('sendBtn');
+            var text = input.value.trim();
+            var apiKey = (localStorage.getItem('gemini_api_key') || '').trim();
+
+            if (!text) {
+                alert('請輸入訊息！');
+                return;
+            }
+            if (!apiKey) {
+                alert('⚠️ 未偵測到 API Key！請先返回 Hub 設定。');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // 1. 即時將用戶訊息顯示在畫面上
+            chatBox.innerHTML += `
+                <div class="flex justify-end">
+                    <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-blue-600 text-white">
+                        ${text.replace(/</g, "&lt;")}
+                    </div>
+                </div>
+            `;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            sendBtn.disabled = true;
+            sendBtn.innerText = '...';
+
+            // 2. 透過 CORS Proxy 呼叫 gemini-3.8-flash
+            var targetUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=' + encodeURIComponent(apiKey);
+            var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+
+            fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [
+                        { role: 'user', parts: [{ text: '[System Instructions: ' + SYSTEM_PROMPT + '] ' + text }] }
+                    ]
+                })
+            })
+            .then(function(res) {
+                return res.json().then(function(data) {
+                    return { ok: res.ok, data: data };
+                });
+            })
+            .then(function(result) {
+                sendBtn.disabled = false;
+                sendBtn.innerText = '傳送';
+
+                if (result.ok && result.data.candidates && result.data.candidates[0] && result.data.candidates[0].content && result.data.candidates[0].content.parts && result.data.candidates[0].content.parts[0].text) {
+                    var reply = result.data.candidates[0].content.parts[0].text;
+                    chatBox.innerHTML += `
+                        <div class="flex justify-start">
+                            <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 text-slate-200">
+                                ${reply.replace(/\n/g, '<br>')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    var errReason = result.data.error ? result.data.error.message : JSON.stringify(result.data);
+                    chatBox.innerHTML += `
+                        <div class="flex justify-start">
+                            <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-xs bg-red-950 border border-red-800 text-red-200 font-mono">
+                                ⚠️ 錯誤: ${errReason}
+                            </div>
+                        </div>
+                    `;
+                }
+                chatBox.scrollTop = chatBox.scrollHeight;
+            })
+            .catch(function(err) {
+                sendBtn.disabled = false;
+                sendBtn.innerText = '傳送';
+                chatBox.innerHTML += `
+                    <div class="flex justify-start">
+                        <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-red-950 border border-red-800 text-red-200">
+                            ⚠️ 網絡異常: ${err.message}
+                        </div>
+                    </div>
+                `;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+        }
+    </script>
+</body>
+</html>
